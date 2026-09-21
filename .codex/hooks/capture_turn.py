@@ -115,7 +115,7 @@ def main() -> int:
     log_dir.mkdir(parents=True, exist_ok=True)
     timestamp = utc_now()
 
-    lock_path = log_dir / ".capture.lock"
+    lock_path = root / ".git" / "agent-capture.lock"
     with lock_path.open("a", encoding="utf-8") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
         path = find_log(log_dir, session_id)
