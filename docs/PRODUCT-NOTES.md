@@ -54,8 +54,10 @@ Alexa, seller central, lists, recommendations engine) is out of scope.
 
 ## Build decisions
 
-- Next.js App Router, Tailwind. Catalog: 194 products from DummyJSON, baked into
-  `src/data/products.json` so the site has no runtime dependency.
+- Next.js App Router, Tailwind. Catalog: 194 products from DummyJSON, seeded into
+  Postgres from `src/data/products.json`.
 - Search/filter/sort run on the server from URL params, so results are shareable links.
-- Cart and orders live in `localStorage`. No accounts, no real payments; the card form
-  only validates format.
+- First version kept cart and orders in `localStorage`. Replaced with a Postgres backend
+  (Next.js Route Handlers, email/password accounts, server-side cart and transactional
+  checkout), since the backend is the part that matters for an SWE submission. No real
+  payments; the card is only Luhn-checked.
