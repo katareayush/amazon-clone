@@ -12,10 +12,11 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 
 
 AUTHOR = "katareayush"
-TOOL = "codex-desktop"
+TOOL = "claude-code"
 
 
 def utc_now() -> str:
@@ -102,15 +103,57 @@ def write_atomic(path: Path, content: str) -> None:
             os.unlink(temp_name)
 
 
+def from_transcript(path: str | None) -> tuple[str | None, str | None]:
+    """Return (model, last assistant text) from a Claude Code JSONL transcript."""
+    if not path or not os.path.exists(path):
+        return None, None
+    model = text = None
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            msg = row.get("message") if isinstance(row, dict) else None
+            if row.get("type") != "assistant" or not isinstance(msg, dict):
+                continue
+            model = msg.get("model") or model
+            parts = [c.get("text", "") for c in msg.get("content") or [] if isinstance(c, dict) and c.get("type") == "text"]
+            if any(p.strip() for p in parts):
+                text = "\n".join(parts).strip()
+    return model, text
+
+
+def model_cache(root: Path, session_id: str) -> Path:
+    return root / ".git" / f"agent-capture-model-{session_id}"
+
+
 def main() -> int:
     event = json.load(sys.stdin)
     event_name = event.get("hook_event_name")
-    if event_name not in {"UserPromptSubmit", "Stop"}:
+    if event_name not in {"SessionStart", "UserPromptSubmit", "Stop"}:
         return 0
 
     session_id = str(event["session_id"])
-    model = str(event.get("model") or "unknown")
     root = git_root(str(event.get("cwd") or os.getcwd()))
+
+    # Only SessionStart carries the model; the transcript has none until the
+    # first reply, so remember it for the session's first prompt.
+    cache = model_cache(root, session_id)
+    if event_name == "SessionStart":
+        if event.get("model"):
+            cache.write_text(str(event["model"]), encoding="utf-8")
+        return 0
+
+    t_model, t_text = from_transcript(event.get("transcript_path"))
+    # Headless (-p) runs flush the transcript after Stop fires; give it a moment.
+    for _ in range(12):
+        if t_model or event_name != "Stop":
+            break
+        time.sleep(0.25)
+        t_model, t_text = from_transcript(event.get("transcript_path"))
+    cached = cache.read_text(encoding="utf-8").strip() if cache.exists() else None
+    model = str(event.get("model") or t_model or cached or "unknown")
     project = root.name
     log_dir = root / ".agent-logs"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -148,21 +191,25 @@ def main() -> int:
             write_atomic(path, header + body + entry)
             return 0
 
-        response = event.get("last_assistant_message")
+        response = event.get("last_assistant_message") or t_text
         if not isinstance(response, str):
             raise ValueError("Stop did not include a string last_assistant_message")
         if path is None:
             raise ValueError("Stop arrived before a captured prompt")
         current = path.read_text(encoding="utf-8")
-        number = len(re.findall(r"^\[LOG_ENTRY type=RESPONSE ", current, re.M)) + 1
+        # Pair the response with the latest prompt so an interrupted turn
+        # (prompt with no Stop) does not shift every later response number.
+        prompts = re.findall(r"^\[LOG_ENTRY type=PROMPT num=(\d+) ", current, re.M)
+        number = int(prompts[-1]) if prompts else 1
+        if model != "unknown":
+            current = re.sub(r"^model: unknown$", f"model: {model}", current, count=1, flags=re.M)
         entry = (
             f"\n[LOG_ENTRY type=RESPONSE num={number} session={session_id[:8]}]\n"
             f"timestamp: {timestamp}\n"
             f"model: {model}\n\n"
             f"{response}\n"
         )
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(entry)
+        write_atomic(path, current + entry)
 
     return 0
 
