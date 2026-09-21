@@ -5,15 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Logo from "@/components/Logo";
-import { deliveryDate, formatPrice } from "@/lib/format";
-import { clearCart, saveOrder, setQty, useCart, type Address } from "@/lib/store";
+import { api, refreshSession, RequestError, setCartQty, useCart } from "@/lib/client/api";
+import { deliveryDate, formatCents } from "@/lib/format";
+import { DELIVERY_SPEEDS, orderTotals, type DeliverySpeed } from "@/lib/pricing";
+import type { Address } from "@/server/db/schema";
 
-const TAX_RATE = 0.08875;
-const SPEEDS = [
-  { id: "standard", label: "FREE Standard Delivery", days: 5, cost: 0 },
-  { id: "prime", label: "FREE Two-Day Delivery", days: 2, cost: 0 },
-  { id: "one-day", label: "One-Day Delivery", days: 1, cost: 9.99 },
-];
+const SPEEDS = Object.entries(DELIVERY_SPEEDS) as [DeliverySpeed, (typeof DELIVERY_SPEEDS)[DeliverySpeed]][];
 const EMPTY_ADDRESS: Address = { name: "", line1: "", city: "", state: "", zip: "", phone: "" };
 
 function Step({ n, title, done, children, summary, onEdit }: {
@@ -37,21 +34,20 @@ function Step({ n, title, done, children, summary, onEdit }: {
   );
 }
 
-export default function CheckoutPage() {
+export default function CheckoutForm({ userName }: { userName: string }) {
   const router = useRouter();
-  const { items, count, subtotal } = useCart();
-  const [address, setAddress] = useState<Address>(EMPTY_ADDRESS);
+  const { cart, isLoading } = useCart();
+  const { items, count } = cart;
+  const [address, setAddress] = useState<Address>({ ...EMPTY_ADDRESS, name: userName });
   const [addressDone, setAddressDone] = useState(false);
   const [payment, setPayment] = useState<"card" | "cod">("card");
-  const [card, setCard] = useState({ number: "4242 4242 4242 4242", name: "", exp: "12/30" });
+  const [card, setCard] = useState({ number: "4242 4242 4242 4242", name: userName, exp: "12/30" });
   const [paymentDone, setPaymentDone] = useState(false);
-  const [speed, setSpeed] = useState(SPEEDS[1]);
+  const [speed, setSpeed] = useState<DeliverySpeed>("two-day");
   const [errors, setErrors] = useState<string[]>([]);
   const [placing, setPlacing] = useState(false);
 
-  const shipping = speed.cost;
-  const tax = Math.round(subtotal * TAX_RATE * 100) / 100;
-  const total = subtotal + shipping + tax;
+  const totals = orderTotals(items, speed);
   const cardLast4 = card.number.replace(/\D/g, "").slice(-4);
 
   function submitAddress(e: React.FormEvent) {
@@ -79,24 +75,33 @@ export default function CheckoutPage() {
     if (!errs.length) setPaymentDone(true);
   }
 
-  function placeOrder() {
+  async function placeOrder() {
     setPlacing(true);
-    const id = `112-${Math.floor(1e6 + Math.random() * 9e6)}-${Math.floor(1e6 + Math.random() * 9e6)}`;
-    saveOrder({
-      id,
-      placedAt: new Date().toISOString(),
-      items,
-      subtotal,
-      shipping,
-      tax,
-      total,
-      address,
-      payment: payment === "card" ? `Card ending in ${cardLast4}` : "Pay on Delivery",
-      delivery: deliveryDate(speed.days),
-    });
-    clearCart();
-    router.push(`/orders?placed=${id}`);
+    setErrors([]);
+    try {
+      const { id } = await api<{ id: string }>("/api/orders", {
+        method: "POST",
+        body: { address, payment: payment === "card" ? { method: "card", ...card } : { method: "cod" }, speed },
+      });
+      await refreshSession();
+      router.push(`/orders/${id}?placed=1`);
+    } catch (e) {
+      // The server re-validates everything; surface its field messages if any slipped through.
+      const err = e instanceof RequestError ? e : null;
+      setErrors(err?.fields ? Object.values(err.fields) : [err?.message ?? "Couldn't place your order. Try again."]);
+      setPlacing(false);
+    }
   }
+
+  async function setQty(id: number, qty: number) {
+    try {
+      await setCartQty(id, qty);
+    } catch (e) {
+      setErrors([e instanceof RequestError ? e.message : "Couldn't update quantity."]);
+    }
+  }
+
+  if (isLoading) return <div className="min-h-screen" />;
 
   if (!items.length && !placing) {
     return (
@@ -199,18 +204,18 @@ export default function CheckoutPage() {
 
           <Step n={3} title="Review items and delivery" done={false}>
             <div className="rounded-lg border border-line p-4">
-              <p className="text-lg font-bold text-success">Arriving {deliveryDate(speed.days)}</p>
+              <p className="text-lg font-bold text-success">Arriving {deliveryDate(DELIVERY_SPEEDS[speed].days)}</p>
               <div className="mt-3 flex flex-col gap-4 md:flex-row">
                 <ul className="flex-1 space-y-4">
                   {items.map((item) => (
-                    <li key={item.id} className="flex gap-3 text-sm">
+                    <li key={item.productId} className="flex gap-3 text-sm">
                       <Image src={item.thumbnail} alt={item.title} width={80} height={80} className="h-20 w-20 object-contain" />
                       <div>
                         <p className="line-clamp-2 font-bold">{item.title}</p>
-                        <p className="font-bold text-deal">{formatPrice(item.price)}</p>
+                        <p className="font-bold text-deal">{formatCents(item.priceCents)}</p>
                         <label className="mt-1 inline-flex items-center gap-1 rounded-lg border border-line bg-[#f0f2f2] px-2 text-xs shadow-sm">
                           Qty:
-                          <select value={item.qty} onChange={(e) => setQty(item.id, Number(e.target.value))} className="bg-transparent">
+                          <select value={item.qty} onChange={(e) => setQty(item.productId, Number(e.target.value))} className="bg-transparent">
                             {Array.from({ length: Math.min(item.stock, 30) + 1 }, (_, i) => (
                               <option key={i} value={i}>{i === 0 ? "0 (Delete)" : i}</option>
                             ))}
@@ -222,13 +227,13 @@ export default function CheckoutPage() {
                 </ul>
                 <fieldset className="text-sm md:w-64">
                   <legend className="font-bold">Choose your delivery option:</legend>
-                  {SPEEDS.map((s) => (
-                    <label key={s.id} className="mt-2 flex items-start gap-2">
-                      <input type="radio" name="speed" className="mt-1" checked={speed.id === s.id} onChange={() => setSpeed(s)} />
+                  {SPEEDS.map(([id, s]) => (
+                    <label key={id} className="mt-2 flex items-start gap-2">
+                      <input type="radio" name="speed" className="mt-1" checked={speed === id} onChange={() => setSpeed(id)} />
                       <span>
                         <b className="text-success">{deliveryDate(s.days)}</b>
                         <br />
-                        <span className="text-muted">{s.cost ? `${formatPrice(s.cost)} - ${s.label}` : s.label}</span>
+                        <span className="text-muted">{s.cents ? `${formatCents(s.cents)} - ${s.label}` : s.label}</span>
                       </span>
                     </label>
                   ))}
@@ -251,11 +256,11 @@ export default function CheckoutPage() {
           )}
           <h3 className="mt-4 text-lg font-bold">Order Summary</h3>
           <dl className="mt-2 space-y-1">
-            {[["Items:", subtotal], ["Shipping & handling:", shipping], ["Estimated tax:", tax]].map(([k, v]) => (
-              <div key={k as string} className="flex justify-between"><dt>{k}</dt><dd>{formatPrice(v as number)}</dd></div>
+            {([["Items:", totals.subtotalCents], ["Shipping & handling:", totals.shippingCents], ["Estimated tax:", totals.taxCents]] as const).map(([k, v]) => (
+              <div key={k} className="flex justify-between"><dt>{k}</dt><dd>{formatCents(v)}</dd></div>
             ))}
             <div className="flex justify-between border-t border-gray-200 pt-2 text-lg font-bold text-deal">
-              <dt>Order total:</dt><dd>{formatPrice(total)}</dd>
+              <dt>Order total:</dt><dd>{formatCents(totals.totalCents)}</dd>
             </div>
           </dl>
         </aside>

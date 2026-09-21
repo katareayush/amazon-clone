@@ -3,7 +3,8 @@ import { Suspense } from "react";
 import Logo from "./Logo";
 import SearchBar from "./SearchBar";
 import CartLink from "./CartLink";
-import { CATEGORY_LABELS, products } from "@/lib/products";
+import AccountLink from "./AccountLink";
+import { CATEGORY_LABELS } from "@/lib/categories";
 
 const NAV = [
   ["Today's Deals", "/s?deals=1"],
@@ -19,7 +20,6 @@ const NAV = [
 ];
 
 export default function Header() {
-  const titles = products.map((p) => p.title);
   return (
     <header className="sticky top-0 z-40 text-white">
       <div className="flex items-center gap-1 bg-nav px-2 py-1.5 sm:gap-2 sm:px-4">
@@ -33,12 +33,9 @@ export default function Header() {
           </div>
         </div>
         <Suspense fallback={<div className="h-10 flex-1 rounded-md bg-white" />}>
-          <SearchBar departments={CATEGORY_LABELS} titles={titles} />
+          <SearchBar departments={CATEGORY_LABELS} />
         </Suspense>
-        <Link href="/orders" className="hidden shrink-0 rounded-sm border border-transparent px-1.5 py-1 leading-tight hover:border-white md:block">
-          <div className="text-xs">Hello, sign in</div>
-          <div className="text-sm font-bold">Account &amp; Lists</div>
-        </Link>
+        <AccountLink />
         <Link href="/orders" className="hidden shrink-0 rounded-sm border border-transparent px-1.5 py-1 leading-tight hover:border-white md:block">
           <div className="text-xs">Returns</div>
           <div className="text-sm font-bold">&amp; Orders</div>

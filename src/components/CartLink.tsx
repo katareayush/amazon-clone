@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCart } from "@/lib/store";
+import { useCart } from "@/lib/client/api";
 
 export default function CartLink() {
-  const { count } = useCart();
+  const { count } = useCart().cart;
   return (
     <Link href="/cart" className="flex shrink-0 items-end rounded-sm border border-transparent px-1.5 py-1 hover:border-white" aria-label={`Cart, ${count} items`}>
       <span className="relative">

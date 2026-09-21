@@ -6,20 +6,25 @@ import BuyBox from "@/components/BuyBox";
 import Gallery from "@/components/Gallery";
 import Price from "@/components/Price";
 import Stars from "@/components/Stars";
-import { cartItem } from "@/components/ProductCard";
-import {
-  badge, boughtLastMonth, byCategory, CATEGORY_LABELS, compact, deliveryDate, getProduct, listPrice, products, ratingCount,
-} from "@/lib/products";
+import { categoryLabel } from "@/lib/categories";
+import { compact, deliveryDate } from "@/lib/format";
+import { listPriceCents } from "@/lib/pricing";
+import { allProductIds, getProduct, relatedProducts } from "@/server/catalog";
 
-// Delivery dates are relative to today.
-export const revalidate = 3600;
+// Delivery dates and stock change; checkout re-checks stock regardless.
+export const revalidate = 60;
 
-export function generateStaticParams() {
-  return products.map((p) => ({ id: String(p.id) }));
+export async function generateStaticParams() {
+  return (await allProductIds()).map((p) => ({ id: String(p.id) }));
+}
+
+async function load(params: Promise<{ id: string }>) {
+  const id = Number((await params).id);
+  return Number.isInteger(id) ? getProduct(id) : null;
 }
 
 export async function generateMetadata(props: PageProps<"/dp/[id]">): Promise<Metadata> {
-  const p = getProduct(Number((await props.params).id));
+  const p = await load(props.params);
   return { title: p ? `${p.title} : Amazon Clone` : "Product not found" };
 }
 
@@ -31,25 +36,25 @@ function histogram(rating: number) {
 }
 
 export default async function ProductPage(props: PageProps<"/dp/[id]">) {
-  const p = getProduct(Number((await props.params).id));
+  const p = await load(props.params);
   if (!p) notFound();
 
-  const count = ratingCount(p);
-  const b = badge(p);
-  const bought = boughtLastMonth(p);
-  const related = byCategory(p.category).filter((x) => x.id !== p.id);
+  const count = p.ratingCount;
+  const b = p.badge;
+  const bought = p.boughtLastMonth;
+  const related = await relatedProducts(p);
   const overview: [string, string][] = [
     ["Brand", p.brand ?? "Generic"],
-    ["Category", CATEGORY_LABELS[p.category]],
+    ["Category", categoryLabel(p.category)],
     ["Dimensions", `${p.dimensions.width} x ${p.dimensions.height} x ${p.dimensions.depth} cm`],
     ["Item Weight", `${p.weight} ${p.weight === 1 ? "pound" : "pounds"}`],
-    ["Warranty", p.warrantyInformation],
+    ["Warranty", p.warranty],
   ];
 
   return (
     <div className="mx-auto max-w-[1500px] px-4 py-3">
       <nav className="mb-3 text-xs text-muted">
-        <Link href={`/s?i=${p.category}`} className="hover:text-link-hover hover:underline">{CATEGORY_LABELS[p.category]}</Link>
+        <Link href={`/s?i=${p.category}`} className="hover:text-link-hover hover:underline">{categoryLabel(p.category)}</Link>
         {p.brand && (
           <>
             {" › "}
@@ -76,10 +81,10 @@ export default async function ProductPage(props: PageProps<"/dp/[id]">) {
           <hr className="my-3 border-gray-200" />
           <div className="flex items-start gap-2">
             {p.discountPercentage >= 5 && <span className="text-[28px] font-light text-deal">-{Math.round(p.discountPercentage)}%</span>}
-            <Price value={p.price} />
+            <Price cents={p.priceCents} />
           </div>
           {p.discountPercentage >= 5 && (
-            <div className="text-xs text-muted">List Price: <s>${listPrice(p).toFixed(2)}</s></div>
+            <div className="text-xs text-muted">List Price: <s>${(listPriceCents(p) / 100).toFixed(2)}</s></div>
           )}
           <table className="mt-4 text-sm">
             <tbody>
@@ -95,12 +100,14 @@ export default async function ProductPage(props: PageProps<"/dp/[id]">) {
           <h2 className="text-base font-bold">About this item</h2>
           <ul className="mt-1 list-disc space-y-1 pl-5 text-sm">
             {p.description.split(/(?<=\.)\s+/).map((s) => <li key={s}>{s}</li>)}
-            <li>{p.shippingInformation}. {p.returnPolicy}.</li>
+            <li>{p.shipping}. {p.returnPolicy}.</li>
           </ul>
         </div>
 
         <BuyBox
-          item={cartItem(p)}
+          productId={p.id}
+          priceCents={p.priceCents}
+          stock={p.stock}
           delivery={deliveryDate(p.id % 3 + 2)}
           fastest={deliveryDate(1)}
           returnPolicy={p.returnPolicy}
@@ -117,8 +124,8 @@ export default async function ProductPage(props: PageProps<"/dp/[id]">) {
                   <Image src={r.thumbnail} alt={r.title} width={150} height={150} className="max-h-36 w-auto object-contain mix-blend-multiply" />
                 </div>
                 <div className="mt-1 line-clamp-2 text-link hover:text-link-hover">{r.title}</div>
-                <div className="flex items-center gap-1"><Stars rating={r.rating} size={13} /> <span className="text-xs text-link">{compact(ratingCount(r))}</span></div>
-                <div className="text-deal">${r.price.toFixed(2)}</div>
+                <div className="flex items-center gap-1"><Stars rating={r.rating} size={13} /> <span className="text-xs text-link">{compact(r.ratingCount)}</span></div>
+                <div className="text-deal">${(r.priceCents / 100).toFixed(2)}</div>
               </Link>
             ))}
           </div>

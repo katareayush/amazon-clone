@@ -1,0 +1,28 @@
+export const CATEGORY_LABELS: Record<string, string> = {
+  beauty: "Beauty",
+  fragrances: "Fragrances",
+  furniture: "Furniture",
+  groceries: "Grocery",
+  "home-decoration": "Home Decor",
+  "kitchen-accessories": "Kitchen",
+  laptops: "Laptops",
+  "mens-shirts": "Men's Shirts",
+  "mens-shoes": "Men's Shoes",
+  "mens-watches": "Men's Watches",
+  "mobile-accessories": "Mobile Accessories",
+  motorcycle: "Motorcycle",
+  "skin-care": "Skin Care",
+  smartphones: "Smartphones",
+  "sports-accessories": "Sports & Outdoors",
+  sunglasses: "Sunglasses",
+  tablets: "Tablets",
+  tops: "Women's Tops",
+  vehicle: "Automotive",
+  "womens-bags": "Women's Bags",
+  "womens-dresses": "Women's Dresses",
+  "womens-jewellery": "Jewelry",
+  "womens-shoes": "Women's Shoes",
+  "womens-watches": "Women's Watches",
+};
+
+export const categoryLabel = (slug: string) => CATEGORY_LABELS[slug] ?? slug;

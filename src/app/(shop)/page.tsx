@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import Hero from "@/components/Hero";
-import { byCategory, CATEGORY_LABELS, products, ratingCount } from "@/lib/products";
+import { CATEGORY_LABELS } from "@/lib/categories";
+import { topProducts, type ProductSummary } from "@/server/catalog";
 
 // Delivery dates are relative to today.
 export const revalidate = 3600;
@@ -23,7 +24,7 @@ function Card({ children, title, more, moreHref }: { children: React.ReactNode; 
   );
 }
 
-function Row({ title, items, href }: { title: string; items: typeof products; href: string }) {
+function Row({ title, items, href }: { title: string; items: ProductSummary[]; href: string }) {
   return (
     <section className="bg-white p-5">
       <div className="mb-3 flex items-baseline gap-4">
@@ -41,10 +42,18 @@ function Row({ title, items, href }: { title: string; items: typeof products; hr
   );
 }
 
-export default function Home() {
-  const deals = [...products].sort((a, b) => b.discountPercentage - a.discountPercentage).slice(0, 16);
-  const popular = [...products].sort((a, b) => ratingCount(b) - ratingCount(a)).slice(0, 16);
-  const top = (cat: string) => byCategory(cat).sort((a, b) => ratingCount(b) - ratingCount(a))[0];
+const PICK_CATS = ["laptops", "mens-watches", "sports-accessories", "kitchen-accessories"];
+
+export default async function Home() {
+  const cats = [...new Set([...GRID_CARDS.flatMap((c) => c.cats), ...PICK_CATS])];
+  const [deals, popular, beauty, ...tops] = await Promise.all([
+    topProducts({ by: "deals", limit: 16 }),
+    topProducts({ by: "popular", limit: 16 }),
+    topProducts({ by: "popular", category: "beauty", limit: 16 }),
+    ...cats.map((category) => topProducts({ by: "popular", category, limit: 1 })),
+  ]);
+  const topByCat = new Map(cats.map((c, i) => [c, tops[i][0]]));
+  const top = (cat: string) => topByCat.get(cat)!;
 
   return (
     <div className="bg-page">
@@ -70,7 +79,7 @@ export default function Home() {
           <Row title="Today's Deals" items={deals} href="/s?deals=1" />
           <Row title="Best Sellers across the store" items={popular} href="/s?sort=review" />
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-            {["laptops", "mens-watches", "sports-accessories", "kitchen-accessories"].map((cat) => (
+            {PICK_CATS.map((cat) => (
               <Card key={cat} title={`Top picks in ${CATEGORY_LABELS[cat]}`} more="Shop now" moreHref={`/s?i=${cat}`}>
                 <Link href={`/dp/${top(cat).id}`} className="flex h-72 items-center justify-center bg-[#f7f7f7]">
                   <Image src={top(cat).thumbnail} alt={top(cat).title} width={280} height={280} className="max-h-64 w-auto object-contain mix-blend-multiply" />
@@ -78,7 +87,7 @@ export default function Home() {
               </Card>
             ))}
           </div>
-          <Row title="Picked for you in Beauty" items={byCategory("beauty").concat(byCategory("skin-care"))} href="/s?i=beauty" />
+          <Row title="Picked for you in Beauty" items={beauty} href="/s?i=beauty" />
         </div>
       </div>
     </div>

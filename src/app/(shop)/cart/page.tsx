@@ -2,11 +2,25 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { setQty, useCart } from "@/lib/store";
-import { formatPrice } from "@/lib/format";
+import { useState } from "react";
+import { RequestError, setCartQty, useCart } from "@/lib/client/api";
+import { formatCents } from "@/lib/format";
 
 export default function CartPage() {
-  const { items, count, subtotal } = useCart();
+  const { cart, isLoading } = useCart();
+  const { items, count, subtotalCents } = cart;
+  const [error, setError] = useState("");
+
+  async function setQty(id: number, qty: number) {
+    setError("");
+    try {
+      await setCartQty(id, qty);
+    } catch (e) {
+      setError(e instanceof RequestError ? e.message : "Couldn't update your cart.");
+    }
+  }
+
+  if (isLoading) return <div className="min-h-96 bg-page" />;
 
   return (
     <div className="bg-page py-5">
@@ -14,7 +28,7 @@ export default function CartPage() {
         {items.length > 0 && (
           <aside className="bg-white p-5 lg:w-72">
             <p className="text-lg">
-              Subtotal ({count} {count === 1 ? "item" : "items"}): <b>{formatPrice(subtotal)}</b>
+              Subtotal ({count} {count === 1 ? "item" : "items"}): <b>{formatCents(subtotalCents)}</b>
             </p>
             <Link href="/checkout" className="btn-yellow mt-3 block py-2 text-center">
               Proceed to checkout
@@ -33,15 +47,16 @@ export default function CartPage() {
           ) : (
             <>
               <h1 className="text-[28px]">Shopping Cart</h1>
+              {error && <p role="alert" className="mt-2 text-sm text-deal">{error}</p>}
               <p className="text-right text-sm text-muted">Price</p>
               <ul className="border-t border-gray-200">
                 {items.map((item) => (
-                  <li key={item.id} className="flex gap-4 border-b border-gray-200 py-4">
-                    <Link href={`/dp/${item.id}`} className="flex h-44 w-44 shrink-0 items-center justify-center">
+                  <li key={item.productId} className="flex gap-4 border-b border-gray-200 py-4">
+                    <Link href={`/dp/${item.productId}`} className="flex h-44 w-44 shrink-0 items-center justify-center">
                       <Image src={item.thumbnail} alt={item.title} width={180} height={180} className="max-h-44 w-auto object-contain" />
                     </Link>
                     <div className="min-w-0 flex-1">
-                      <Link href={`/dp/${item.id}`} className="line-clamp-2 text-lg hover:text-link-hover">{item.title}</Link>
+                      <Link href={`/dp/${item.productId}`} className="line-clamp-2 text-lg hover:text-link-hover">{item.title}</Link>
                       <p className={`text-xs ${item.stock < 10 ? "text-deal" : "text-success"}`}>
                         {item.stock < 10 ? `Only ${item.stock} left in stock - order soon.` : "In Stock"}
                       </p>
@@ -50,7 +65,7 @@ export default function CartPage() {
                         <div className="flex items-center overflow-hidden rounded-full border-[3px] border-yellow">
                           <button
                             aria-label={item.qty === 1 ? "Delete" : "Decrease quantity"}
-                            onClick={() => setQty(item.id, item.qty - 1)}
+                            onClick={() => setQty(item.productId, item.qty - 1)}
                             className="px-3 py-1 text-base hover:bg-gray-100"
                           >
                             {item.qty === 1 ? "🗑" : "−"}
@@ -59,22 +74,22 @@ export default function CartPage() {
                           <button
                             aria-label="Increase quantity"
                             disabled={item.qty >= Math.min(item.stock, 30)}
-                            onClick={() => setQty(item.id, item.qty + 1)}
+                            onClick={() => setQty(item.productId, item.qty + 1)}
                             className="px-3 py-1 text-base hover:bg-gray-100 disabled:opacity-30"
                           >
                             +
                           </button>
                         </div>
                         <span className="text-gray-300">|</span>
-                        <button onClick={() => setQty(item.id, 0)} className="link">Delete</button>
+                        <button onClick={() => setQty(item.productId, 0)} className="link">Delete</button>
                       </div>
                     </div>
-                    <div className="text-right text-lg font-bold">{formatPrice(item.price)}</div>
+                    <div className="text-right text-lg font-bold">{formatCents(item.priceCents)}</div>
                   </li>
                 ))}
               </ul>
               <p className="mt-2 text-right text-lg">
-                Subtotal ({count} {count === 1 ? "item" : "items"}): <b>{formatPrice(subtotal)}</b>
+                Subtotal ({count} {count === 1 ? "item" : "items"}): <b>{formatCents(subtotalCents)}</b>
               </p>
             </>
           )}

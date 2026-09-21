@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/client/api";
 
-type Props = { departments: Record<string, string>; titles: string[] };
+type Props = { departments: Record<string, string> };
 
 // Remount when the URL's query changes so the box reflects the current search.
 export default function SearchBar(props: Props) {
@@ -13,17 +14,30 @@ export default function SearchBar(props: Props) {
   return <Search key={`${k}|${i}`} {...props} initialQuery={k} initialDept={i} />;
 }
 
-function Search({ departments, titles, initialQuery, initialDept }: Props & { initialQuery: string; initialDept: string }) {
+function Search({ departments, initialQuery, initialDept }: Props & { initialQuery: string; initialDept: string }) {
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
   const [dept, setDept] = useState(initialDept);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
 
-  const q = query.trim().toLowerCase();
-  const suggestions = q
-    ? titles.filter((t) => t.toLowerCase().includes(q)).slice(0, 8)
-    : [];
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const q = query.trim();
+
+  useEffect(() => {
+    if (!q) return;
+    const ctrl = { cancelled: false };
+    const t = setTimeout(async () => {
+      try {
+        const { suggestions } = await api<{ suggestions: { title: string }[] }>(`/api/products/suggest?q=${encodeURIComponent(q)}`);
+        if (!ctrl.cancelled) setSuggestions(suggestions.map((s) => s.title));
+      } catch {}
+    }, 150);
+    return () => {
+      ctrl.cancelled = true;
+      clearTimeout(t);
+    };
+  }, [q]);
 
   function go(k: string) {
     setOpen(false);
@@ -80,7 +94,7 @@ function Search({ departments, titles, initialQuery, initialDept }: Props & { in
           <path d="M15.5 15.5 21 21" strokeLinecap="round" />
         </svg>
       </button>
-      {open && suggestions.length > 0 && (
+      {open && q && suggestions.length > 0 && (
         <ul className="absolute top-full right-0 left-0 z-50 mt-0.5 overflow-hidden rounded-b-md border border-gray-300 bg-white py-1 text-black shadow-lg">
           {suggestions.map((s, i) => (
             <li key={s}>
