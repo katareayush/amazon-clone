@@ -9,7 +9,7 @@ export default function AccountLink() {
   const router = useRouter();
   return (
     <div className="group relative hidden shrink-0 md:block">
-      <Link href={user ? "/orders" : "/signin"} className="block rounded-sm border border-transparent px-1.5 py-1 leading-tight hover:border-white">
+      <Link href={user ? "/orders" : "/signin"} className="block rounded-sm border border-transparent px-1.5 pt-2.5 pb-1.5 leading-tight hover:border-white">
         <div className="text-xs">Hello, {user ? user.name.split(" ")[0] : "sign in"}</div>
         <div className="text-sm font-bold">Account &amp; Lists ▾</div>
       </Link>

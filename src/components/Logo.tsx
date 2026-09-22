@@ -1,13 +1,15 @@
 export default function Logo({ dark = false }: { dark?: boolean }) {
   return (
-    <span className={`relative inline-flex flex-col leading-none ${dark ? "text-black" : "text-white"}`}>
-      <span className="text-[24px] font-bold tracking-tight">
-        amazon<span className="text-[13px] font-normal">.clone</span>
+    <span className={`inline-flex items-end leading-none ${dark ? "text-black" : "text-white"}`}>
+      <span className="relative pb-2.5">
+        <span className="text-[26px] font-bold tracking-[-0.04em]">amazon</span>
+        {/* The smile spans the wordmark only and curls up into an arrowhead under the "n". */}
+        <svg viewBox="0 0 100 16" preserveAspectRatio="none" className="absolute inset-x-0 bottom-0 h-3.5 w-full" aria-hidden>
+          <path d="M3 4 Q50 18 93 5" stroke="#ff9900" strokeWidth="3.5" fill="none" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          <path d="M86 1.5 L95.5 4.5 L89 11.5" stroke="#ff9900" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        </svg>
       </span>
-      <svg viewBox="0 0 100 14" className="-mt-1 ml-1 w-[62px]" aria-hidden>
-        <path d="M2 3 Q50 16 92 4" stroke="#ff9900" strokeWidth="4" fill="none" strokeLinecap="round" />
-        <path d="M84 1 L95 3.5 L89 12" stroke="#ff9900" strokeWidth="3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
+      <span className="pb-2.5 pl-0.5 text-[11px] font-normal">.clone</span>
     </span>
   );
 }

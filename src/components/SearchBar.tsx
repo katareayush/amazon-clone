@@ -61,7 +61,7 @@ function Search({ departments, initialQuery, initialDept }: Props & { initialQue
         aria-label="Search in"
         value={dept}
         onChange={(e) => setDept(e.target.value)}
-        className="hidden w-auto max-w-40 rounded-l-md border-r border-gray-300 bg-[#e6e6e6] px-2 text-xs text-[#555] hover:bg-[#d4d4d4] sm:block"
+        className="hidden w-auto max-w-32 appearance-none rounded-l-md border-r border-gray-300 bg-[#e6e6e6] bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 10 6%22><path d=%22M0 0h10L5 6z%22 fill=%22%23555%22/></svg>')] bg-[length:8px] bg-[position:right_8px_center] bg-no-repeat py-0 pr-5 pl-2.5 text-xs text-[#555] hover:bg-[#d4d4d4] sm:block"
       >
         <option value="">All</option>
         {Object.entries(departments).map(([slug, label]) => (

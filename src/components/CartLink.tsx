@@ -6,16 +6,23 @@ import { useCart } from "@/lib/client/api";
 export default function CartLink() {
   const { count } = useCart().cart;
   return (
-    <Link href="/cart" className="flex shrink-0 items-end rounded-sm border border-transparent px-1.5 py-1 hover:border-white" aria-label={`Cart, ${count} items`}>
-      <span className="relative">
-        <svg width="40" height="32" viewBox="0 0 40 32" fill="none" stroke="white" strokeWidth="2.2" aria-hidden>
-          <path d="M2 4h6l5 18h20l4-13H11" strokeLinejoin="round" />
-          <circle cx="15" cy="27" r="2.3" fill="white" />
-          <circle cx="30" cy="27" r="2.3" fill="white" />
+    <Link
+      href="/cart"
+      aria-label={`Cart, ${count} items`}
+      className="flex h-[46px] shrink-0 items-end gap-0.5 rounded-sm border border-transparent px-1.5 pb-1.5 hover:border-white"
+    >
+      <span className="relative block">
+        {/* The count floats over the basket's top-left, the way Amazon's does. */}
+        <span className="absolute top-0 left-[11px] w-6 -translate-x-1/2 text-center text-base leading-none font-bold text-[#f08804]">
+          {count}
+        </span>
+        <svg width="36" height="26" viewBox="0 0 40 30" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden className="mt-3.5">
+          <path d="M1 3h6.5l5.5 17h20l5-12.5H12" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="15.5" cy="25.5" r="2.4" fill="currentColor" stroke="none" />
+          <circle cx="30" cy="25.5" r="2.4" fill="currentColor" stroke="none" />
         </svg>
-        <span className="absolute top-0 left-[19px] w-5 text-center text-base font-bold text-[#f08804]">{count}</span>
       </span>
-      <span className="hidden text-sm font-bold sm:inline">Cart</span>
+      <span className="hidden text-sm leading-none font-bold sm:inline">Cart</span>
     </Link>
   );
 }
